@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우주 추진기관 엔진 시뮬레이터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Pretendard', sans-serif; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-orbitron text-xl font-bold tracking-wider bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">PROPULSION LAB</h1>
+                    <p class="text-xs text-slate-400">우주 추진체 엔진 통합 시뮬레이터 v1.0</p>
+                </div>
+            </div>
+            <!-- Mode Switcher Tabs -->
+            <div class="flex bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                <button onclick="setEngineMode('chemical')" id="btn-chemical" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white shadow-md">화학 로켓 (Chemical)</button>
+                <button onclick="setEngineMode('ion')" id="btn-ion" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white">이온 추진기 (Ion)</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow w-full">
+        
+        <!-- Left & Center: Simulation Canvas & Status -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            <!-- Canvas Display Box -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-2xl relative overflow-hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <span id="engine-title" class="font-orbitron text-sm text-blue-400 font-bold uppercase tracking-wider">실시간 연소실 / 배기 플룸 시각화</span>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-xs text-emerald-400 font-medium">SIMULATION ACTIVE</span>
+                    </div>
+                </div>
+                
+                <!-- Canvas Element -->
+                <div class="w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 relative aspect-[16/9] flex items-center justify-center">
+                    <canvas id="simCanvas" class="w-full h-full cursor-pointer"></canvas>
+                    <div id="canvas-overlay" class="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700/50 text-xs text-slate-300 font-mono">
+                        클릭하여 부스트(점화) 강화
+                    </div>
+                </div>
+
+                <!-- Live Metrics Bar -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                        <span class="text-xs text-slate-400 block mb-1">발생 추력 (Thrust)</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="val-thrust" class="font-orbitron text-xl font-bold text-blue-400">0.0</span>
+                            <span id="unit-thrust" class="text-xs text-slate-400">kN</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                        <span class="text-xs text-slate-400 block mb-1">비추력 (Isp)</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="val-isp" class="font-orbitron text-xl font-bold text-indigo-400">0</span>
+                            <span class="text-xs text-slate-400">s</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                        <span class="text-xs text-slate-400 block mb-1">배기 속도 ($v_e$)</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="val-ve" class="font-orbitron text-xl font-bold text-cyan-400">0</span>
+                            <span class="text-xs text-slate-400">m/s</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                        <span class="text-xs text-slate-400 block mb-1">추진제 소모율</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="val-mdot" class="font-orbitron text-xl font-bold text-amber-400">0.0</span>
+                            <span id="unit-mdot" class="text-xs text-slate-400">kg/s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Physics Equations & Theory Card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                <h3 class="font-orbitron text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    핵심 물리 방정식 및 작동 원리
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+                    <div class="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800/60">
+                        <span class="text-xs font-semibold text-blue-400 uppercase tracking-wide block mb-1">추력 공식 (Thrust Equation)</span>
+                        <p class="font-mono text-xs bg-slate-900 p-2 rounded mb-2 text-indigo-300">$$F = \dot{m} v_e + (p_e - p_0)A_e$$</p>
+                        <p class="text-xs text-slate-400">추진제 질량 유량($\dot{m}$)과 유효 배기 속도($v_e$)에 비례하며, 대기압($p_0$)과의 압력 차이에 의해 최종 추력이 결정됩니다.</p>
+                    </div>
+                    <div class="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800/60">
+                        <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wide block mb-1">비추력 (Specific Impulse, Isp)</span>
+                        <p class="font-mono text-xs bg-slate-900 p-2 rounded mb-2 text-indigo-300">$$I_{sp} = \frac{v_e}{g_0}$$</p>
+                        <p class="text-xs text-slate-400">연료 효율성을 나타내는 지표로, 이온 추진기는 화학 로켓보다 훨씬 높은 비추력(수천 초)을 가집니다.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Controls & Parameters -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col justify-between">
+            <div class="space-y-6">
+                <div>
+                    <h2 class="font-orbitron text-base font-bold text-slate-100 mb-1">엔진 파라미터 제어</h2>
+                    <p class="text-xs text-slate-400">슬라이더를 조절하여 엔진 성능을 실시간 시뮬레이션하세요.</p>
+                </div>
+
+                <!-- Chemical Controls -->
+                <div id="controls-chemical" class="space-y-5">
+                    <!-- Propellant Combo -->
+                    <div>
+                        <label class="text-xs font-semibold text-slate-300 block mb-2">추진제 조합 (Propellant)</label>
+                        <select id="chem-type" onchange="updateChemPresets()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                            <option value="lox-rp1">LOX / RP-1 (등유 - 1단 주력)</option>
+                            <option value="lox-lh2">LOX / 액체수소 (LH2 - 고효율 상단)</option>
+                            <option value="hypergolic">MMH / N2O4 (산화제/연료 자가발화)</option>
+                        </select>
+                    </div>
+
+                    <!-- Mass Flow Rate -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300 font-medium">추진제 유량 ($\dot{m}$)</span>
+                            <span id="label-mdot" class="font-mono text-blue-400 font-bold">250.0 kg/s</span>
+                        </div>
+                        <input type="range" id="slider-mdot" min="10" max="1000" step="5" value="250" oninput="triggerUpdate()" class="w-full accent-blue-600 bg-slate-950 h-2 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Chamber Pressure -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300 font-medium">연소실 압력 ($P_c$)</span>
+                            <span id="label-pc" class="font-mono text-blue-400 font-bold">10.0 MPa</span>
+                        </div>
+                        <input type="range" id="slider-pc" min="2" max="25" step="0.5" value="10" oninput="triggerUpdate()" class="w-full accent-blue-600 bg-slate-950 h-2 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Expansion Ratio -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300 font-medium">노즐 팽창비 ($\epsilon$)</span>
+                            <span id="label-eps" class="font-mono text-blue-400 font-bold">40.0</span>
+                        </div>
+                        <input type="range" id="slider-eps" min="10" max="120" step="1" value="40" oninput="triggerUpdate()" class="w-full accent-blue-600 bg-slate-950 h-2 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Ion Controls (Hidden by default) -->
+                <div id="controls-ion" class="space-y-5 hidden">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-300 block mb-2">추진제 가스 종류</label>
+                        <select id="ion-gas" onchange="triggerUpdate()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="xenon">제논 (Xe - 표준 고효율)</option>
+                            <option value="krypton">크립톤 (Kr - 경량 대안)</option>
+                        </select>
+                    </div>
+
+                    <!-- Beam Voltage -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300 font-medium">가속 전압 ($V_b$)</span>
+                            <span id="label-voltage" class="font-mono text-indigo-400 font-bold">3000 V</span>
+                        </div>
+                        <input type="range" id="slider-voltage" min="500" max="5000" step="100" value="3000" oninput="triggerUpdate()" class="w-full accent-indigo-600 bg-slate-950 h-2 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Beam Current -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5">
+                            <span class="text-slate-300 font-medium">빔 전류 ($I_b$)</span>
+                            <span id="label-current" class="font-mono text-indigo-400 font-bold">5.0 A</span>
+                        </div>
+                        <input type="range" id="slider-current" min="0.5" max="15" step="0.1" value="5.0" oninput="triggerUpdate()" class="w-full accent-indigo-600 bg-slate-950 h-2 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Reset / Preset Info -->
+            <div class="mt-8 pt-4 border-t border-slate-800 text-xs text-slate-400 flex justify-between items-center">
+                <span>GitHub Pages 배포 최적화됨</span>
+                <button onclick="resetDefaults()" class="text-blue-400 hover:text-blue-300 font-semibold underline">기본값 복원</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
+        &copy; 2026 Propulsion Lab. Single-File HTML5 Interactive Simulator.
+    </footer>
+
+    <!-- JavaScript Simulator Logic -->
+    <script>
+        let currentMode = 'chemical'; // 'chemical' or 'ion'
+        
+        // Canvas Setup
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', () => { resizeCanvas(); triggerUpdate(); });
+
+        // Particle System for Exhaust Plume
+        let particles = [];
+        class Particle {
+            constructor(x, y, vx, vy, color, size) {
+                this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+                this.color = color; this.size = size; this.alpha = 1;
+                this.life = 1.0;
+            }
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.life -= dt * 1.5;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Mode Switcher Handler
+        function setEngineMode(mode) {
+            currentMode = mode;
+            const chemBtn = document.getElementById('btn-chemical');
+            const ionBtn = document.getElementById('btn-ion');
+            const chemControls = document.getElementById('controls-chemical');
+            const ionControls = document.getElementById('controls-ion');
+            const title = document.getElementById('engine-title');
+
+            if (mode === 'chemical') {
+                chemBtn.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white shadow-md";
+                ionBtn.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white";
+                chemControls.classList.remove('hidden');
+                ionControls.classList.add('hidden');
+                title.innerText = "화학 로켓 노즐 & 고온 연소 플룸 시각화";
+                document.getElementById('unit-thrust').innerText = "kN";
+                document.getElementById('unit-mdot').innerText = "kg/s";
+            } else {
+                ionBtn.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-indigo-600 text-white shadow-md";
+                chemBtn.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white";
+                ionControls.classList.remove('hidden');
+                chemControls.classList.add('hidden');
+                title.innerText = "이온 추진기 플라즈마 격자 및 가속 빔 시각화";
+                document.getElementById('unit-thrust').innerText = "mN";
+                document.getElementById('unit-mdot').innerText = "mg/s";
+            }
+            particles = [];
+            triggerUpdate();
+        }
+
+        function updateChemPresets() {
+            const type = document.getElementById('chem-type').value;
+            if(type === 'lox-lh2') {
+                document.getElementById('slider-mdot').value = 180;
+            } else if(type === 'hypergolic') {
+                document.getElementById('slider-mdot').value = 80;
+            } else {
+                document.getElementById('slider-mdot').value = 250;
+            }
+            triggerUpdate();
+        }
+
+        function resetDefaults() {
+            if(currentMode === 'chemical') {
+                document.getElementById('chem-type').value = 'lox-rp1';
+                document.getElementById('slider-mdot').value = 250;
+                document.getElementById('slider-pc').value = 10;
+                document.getElementById('slider-eps').value = 40;
+            } else {
+                document.getElementById('ion-gas').value = 'xenon';
+                document.getElementById('slider-voltage').value = 3000;
+                document.getElementById('slider-current').value = 5.0;
+            }
+            triggerUpdate();
+        }
+
+        // Calculation & Simulation Updates
+        let simulationData = {};
+
+        function triggerUpdate() {
+            if (currentMode === 'chemical') {
+                const mdot = parseFloat(document.getElementById('slider-mdot').value);
+                const pc = parseFloat(document.getElementById('slider-pc').value);
+                const eps = parseFloat(document.getElementById('slider-eps').value);
+                const chemType = document.getElementById('chem-type').value;
+
+                document.getElementById('label-mdot').innerText = mdot.toFixed(1) + " kg/s";
+                document.getElementById('label-pc').innerText = pc.toFixed(1) + " MPa";
+                document.getElementById('label-eps').innerText = eps.toFixed(1);
+
+                // Characteristic velocities based on propellants
+                let baseIsp = 300;
+                if(chemType === 'lox-lh2') baseIsp = 450;
+                if(chemType === 'hypergolic') baseIsp = 280;
+
+                const isp = baseIsp * Math.pow(pc / 10, 0.05) * Math.pow(eps / 40, 0.08);
+                const ve = isp * 9.80665;
+                const thrust = (mdot * ve) / 1000; // kN
+
+                document.getElementById('val-thrust').innerText = thrust.toFixed(1);
+                document.getElementById('val-isp').innerText = Math.round(isp);
+                document.getElementById('val-ve').innerText = Math.round(ve);
+                document.getElementById('val-mdot').innerText = mdot.toFixed(1);
+
+                simulationData = { thrust, isp, ve, mdot, intensity: mdot / 1000 };
+            } else {
+                const voltage = parseFloat(document.getElementById('slider-voltage').value);
+                const current = parseFloat(document.getElementById('slider-current').value);
+                const gas = document.getElementById('ion-gas').value;
+
+                document.getElementById('label-voltage').innerText = voltage + " V";
+                document.getElementById('label-current').innerText = current.toFixed(1) + " A";
+
+                // Ion mass (Xenon vs Krypton)
+                let massIon = gas === 'xenon' ? 2.18e-25 : 1.39e-25; // kg
+                let charge = 1.602e-19; // C
+                let mdotMg = current * (massIon / charge) * 1000; // mg/s roughly
+                
+                // Ve = sqrt(2 * q * V / m)
+                let ve = Math.sqrt((2 * charge * voltage) / massIon);
+                let thrustMilliN = 0.5 * current * voltage * (1 / ve) * 2 * 1000; // Simplified scaling
+                let isp = ve / 9.80665;
+
+                // Adjust for realistic display bounds
+                thrustMilliN = current * Math.sqrt(voltage) * 0.45;
+                isp = Math.sqrt(voltage) * 55;
+
+                document.getElementById('val-thrust').innerText = thrustMilliN.toFixed(1);
+                document.getElementById('val-isp').innerText = Math.round(isp);
+                document.getElementById('val-ve').innerText = Math.round(ve);
+                document.getElementById('val-mdot').innerText = mdotMg.toFixed(1);
+
+                simulationData = { thrust: thrustMilliN, isp, ve, mdot: mdotMg, intensity: current / 15 };
+            }
+        }
+
+        // Canvas Animation Loop
+        let lastTime = performance.now();
+        function animate(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            if (canvas.width !== width * window.devicePixelRatio || canvas.height !== height * window.devicePixelRatio) {
+                resizeCanvas();
+            }
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Engine Chamber Structure
+            const centerX = width * 0.25;
+            const centerY = height * 0.5;
+
+            if (currentMode === 'chemical') {
+                // Draw Chemical Rocket Nozzle
+                ctx.save();
+                ctx.fillStyle = '#334155';
+                ctx.strokeStyle = '#64748b';
+                ctx.lineWidth = 3;
+                
+                // Combustion Chamber & Nozzle shape
+                ctx.beginPath();
+                ctx.moveTo(centerX - 80, centerY - 50);
+                ctx.lineTo(centerX, centerY - 50);
+                ctx.lineTo(centerX + 40, centerY - 20); // Throat
+                ctx.lineTo(centerX + 160, centerY - 70); // Exit top
+                ctx.lineTo(centerX + 160, centerY + 70); // Exit bottom
+                ctx.lineTo(centerX + 40, centerY + 20);
+                ctx.lineTo(centerX, centerY + 50);
+                ctx.lineTo(centerX - 80, centerY + 50);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Injector face glow
+                const grad = ctx.createRadialGradient(centerX - 60, centerY, 5, centerX - 60, centerY, 40);
+                grad.addColorStop(0, 'rgba(249, 115, 22, 0.9)');
+                grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(centerX - 80, centerY - 50, 40, 100);
+                ctx.restore();
+
+                // Spawn particles at throat
+                const spawnCount = Math.floor((simulationData.intensity || 0.5) * 5) + 1;
+                for(let i=0; i<spawnCount; i++) {
+                    const vx = 300 + Math.random() * 200;
+                    const vy = (Math.random() - 0.5) * 80;
+                    const colors = ['#f97316', '#ef4444', '#fbbf24', '#38bdf8'];
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    particles.push(new Particle(centerX + 40, centerY + (Math.random() - 0.5) * 30, vx, vy, color, Math.random() * 3 + 1.5));
+                }
+            } else {
+                // Draw Ion Thruster Grid Structure
+                ctx.save();
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2;
+
+                // Body cylinder
+                ctx.fillRect(centerX - 70, centerY - 45, 90, 90);
+                ctx.strokeRect(centerX - 70, centerY - 45, 90, 90);
+
+                // Grids (Screen & Accelerator grids)
+                ctx.fillStyle = '#0ea5e9';
+                ctx.fillRect(centerX + 20, centerY - 45, 6, 90);
+                ctx.fillStyle = '#6366f1';
+                ctx.fillRect(centerX + 28, centerY - 45, 6, 90);
+                ctx.restore();
+
+                // Spawn Ion Beam Particles (Cyan/Blue Plasma)
+                const spawnCount = Math.floor((simulationData.intensity || 0.5) * 6) + 2;
+                for(let i=0; i<spawnCount; i++) {
+                    const vx = 400 + Math.random() * 300;
+                    const vy = (Math.random() - 0.5) * 20;
+                    particles.push(new Particle(centerX + 35, centerY + (Math.random() - 0.5) * 70, vx, vy, '#38bdf8', Math.random() * 2 + 1));
+                }
+            }
+
+            // Update &
